@@ -33,6 +33,9 @@ data class Nota(
     var fallas: String = "",
     var anotaciones: String = "",
 
+    @get:PropertyName("condiciones_equipo") @set:PropertyName("condiciones_equipo")
+    var condicionesEquipo: String = "",
+
     @get:PropertyName("cargo_cargador") @set:PropertyName("cargo_cargador")
     var cargoCargador: Boolean = false,
 
@@ -43,6 +46,10 @@ data class Nota(
     var dejoAmbos: Boolean = false,
 
     var refacciones: MutableList<Refaccion> = mutableListOf(),
+
+    @get:PropertyName("costo_inicial") @set:PropertyName("costo_inicial")
+    var costoInicial: Double = 0.0,
+
     var anticipo: Double = 0.0,
 
     @get:PropertyName("precio_total") @set:PropertyName("precio_total")
@@ -82,9 +89,10 @@ object TiposReparacion {
     const val FORMATEO = "Formateo de Sistema"
     const val CAMBIO_PIEZA = "Cambio de Pieza"
     const val MANTENIMIENTO = "Mantenimiento Preventivo"
+    const val REVISION_GENERAL = "Revisión General"
     const val DIAGNOSTICO = "Diagnóstico General"
 
-    val lista = listOf(FORMATEO, CAMBIO_PIEZA, MANTENIMIENTO, DIAGNOSTICO)
+    val lista = listOf(FORMATEO, CAMBIO_PIEZA, MANTENIMIENTO, REVISION_GENERAL, DIAGNOSTICO)
 }
 
 object TiposEquipo {

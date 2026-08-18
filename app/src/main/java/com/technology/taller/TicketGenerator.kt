@@ -6,15 +6,25 @@ import java.util.Locale
 
 /**
  * Genera el texto del ticket de remisión, igual que generarTicketTexto()
- * de la versión web, incluyendo el aviso legal de 3 meses.
+ * de la versión web, incluyendo el aviso legal de 3 meses y la firma de
+ * conformidad del cliente.
+ *
+ * Las líneas que empiezan con "@B" se imprimen en negrita a tamaño normal,
+ * y las que empiezan con "@@" en negrita a doble tamaño (ver
+ * BluetoothPrinterHelper.escribirTexto). Esos prefijos se quitan antes de
+ * imprimir, nunca se ven en el papel.
  */
 object TicketGenerator {
 
     fun generarTicket(context: Context, nota: Nota): String {
         val money = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
-        val cargador = if (nota.cargoCargador) "Sí" else "No"
-        val solo = if (nota.soloEquipo) "Sí (Solo equipo)" else "No (Con cargador)"
-        val ambos = if (nota.dejoAmbos) "Sí (Ambos)" else "No"
+        val config = NegocioConfig(context)
+        val entrega = when {
+            nota.dejoAmbos -> "Dejó equipo y cargador"
+            nota.cargoCargador -> "Dejó cargador"
+            nota.soloEquipo -> "Solo equipo (sin cargador)"
+            else -> "No especificado"
+        }
 
         val refaccionesTexto = if (nota.refacciones.isEmpty()) {
             "Ninguna"
@@ -22,15 +32,20 @@ object TicketGenerator {
             nota.refacciones.joinToString("\n") { "  * ${it.nombre}: ${money.format(it.costo)}" }
         }
 
-        val nombreNegocio = context.getString(R.string.negocio_nombre)
-        val direccion = context.getString(R.string.negocio_direccion)
-        val telefono = context.getString(R.string.negocio_telefono)
+        val nombreNegocio = config.nombre()
+        val direccion = config.direccion()
+        val telefono = config.telefono()
+        val lema = config.lema()
+        val partesNombre = nombreNegocio.trim().split(" ", limit = 2)
+        val primeraPalabra = partesNombre.getOrElse(0) { nombreNegocio }.uppercase()
+        val segundaPalabra = partesNombre.getOrElse(1) { "" }.uppercase()
 
         return """
 ============================
-   ${espaciar(nombreNegocio.uppercase())}
-   Servicio Técnico Laptops
-   $direccion, Oaxaca
+@M$primeraPalabra
+@M$segundaPalabra
+   $lema
+   $direccion
    Cel: $telefono
 ============================
 Folio: ${nota.folio.ifBlank { "N/A" }}
@@ -40,49 +55,66 @@ Dirección: ${nota.direccion.ifBlank { "N/E" }}
 ----------------------------
 Equipo: ${nota.equipoRecibido.ifBlank { "N/E" }}
 Marca: ${nota.marca.ifBlank { "N/E" }}
+Condiciones al recibir: ${nota.condicionesEquipo.ifBlank { "Sin observaciones" }}
 ----------------------------
 Servicio: ${nota.tipoServicio}
 Falla(s): ${nota.fallas.ifBlank { "N/E" }}
 Anotaciones: ${nota.anotaciones.ifBlank { "Ninguna" }}
 ----------------------------
-Cargador: $cargador
-Equipo: $solo
-Dejó ambos: $ambos
+Entrega: $entrega
 ----------------------------
 Refacciones / Extra:
 $refaccionesTexto
 ----------------------------
+Costo inicial: ${money.format(nota.costoInicial)}
 Anticipo: ${money.format(nota.anticipo)}
-TOTAL FINAL: ${money.format(nota.precioTotal)}
+COSTO FINAL: ${money.format(nota.precioTotal)}
+RESTA POR PAGAR: ${money.format(nota.saldoPendiente)}
 ----------------------------
-Fecha Ingreso: ${nota.fecha}
+Fecha Ingreso: ${nota.fecha.ifBlank { "N/E" }}
 Fecha Entrega: ${nota.fechaEntrega.ifBlank { "Pendiente" }}
 ============================
-¡Gracias por preferirnos!
+${config.mensajeDespedida()}
 ============================
 
-AVISO LEGAL: Si el cliente no
-pasa después de 3 meses por su
-equipo, $nombreNegocio no se hace
-responsable de la pérdida total
-o parcial del equipo.
+AVISO LEGAL: ${config.avisoLegal()}
 ============================
+
+Acepto las condiciones,
+precio y tiempos descritos
+en esta nota de remisión:
+
+_____________________________
+Firma de conformidad del cliente
         """.trimIndent()
     }
 
     fun etiquetaFolio(context: Context, nota: Nota): String {
-        val nombreNegocio = context.getString(R.string.negocio_nombre)
-        val direccion = context.getString(R.string.negocio_direccion)
         return """
 ================================
-   FOLIO: ${nota.folio}
+@@FOLIO: ${nota.folio}
+   Fecha: ${nota.fecha}
    Cliente: ${nota.cliente.ifBlank { "Cliente" }}
-   ${nombreNegocio.uppercase()}
-   $direccion, Oaxaca
+   Tel: ${nota.telefono.ifBlank { "N/E" }}
+   Dir: ${nota.direccion.ifBlank { "N/E" }}
 ================================
         """.trimIndent()
     }
 
-    // Pequeño espaciado tipo "T E C H N O L O G Y" para el encabezado, como en la web
-    private fun espaciar(texto: String): String = texto.toCharArray().joinToString(" ")
+    /**
+     * Quita los prefijos "@M"/"@B"/"@@" que solo tienen sentido para la
+     * impresora térmica (indican negrita/tamaño). Se usa para mostrar el
+     * ticket en pantalla (vista previa) o mandarlo por WhatsApp, donde esos
+     * prefijos no deben verse.
+     */
+    fun textoPlano(texto: String): String {
+        return texto.lines().joinToString("\n") { linea ->
+            when {
+                linea.startsWith("@@") -> linea.removePrefix("@@")
+                linea.startsWith("@M") -> linea.removePrefix("@M")
+                linea.startsWith("@B") -> linea.removePrefix("@B")
+                else -> linea
+            }
+        }
+    }
 }

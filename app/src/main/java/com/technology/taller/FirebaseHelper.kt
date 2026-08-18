@@ -65,7 +65,7 @@ object FirebaseHelper {
         onError: (Exception) -> Unit
     ): ListenerRegistration {
         return db.collection(COLECCION)
-            .orderBy("fecha", Query.Direction.DESCENDING)
+            .orderBy("timestamp", Query.Direction.DESCENDING)
             .limit(30)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -154,6 +154,7 @@ object FirebaseHelper {
         obj.put("marca", nota.marca)
         obj.put("tipo_servicio", nota.tipoServicio)
         obj.put("fallas", nota.fallas)
+        obj.put("condiciones_equipo", nota.condicionesEquipo)
         obj.put("anotaciones", nota.anotaciones)
         obj.put("cargo_cargador", nota.cargoCargador)
         obj.put("solo_equipo", nota.soloEquipo)
@@ -163,6 +164,7 @@ object FirebaseHelper {
             val ro = JSONObject(); ro.put("nombre", r.nombre); ro.put("costo", r.costo); refs.put(ro)
         }
         obj.put("refacciones", refs)
+        obj.put("costo_inicial", nota.costoInicial)
         obj.put("anticipo", nota.anticipo)
         obj.put("precio_total", nota.precioTotal)
         val fotos = JSONArray(); nota.fotos.forEach { fotos.put(it) }
@@ -182,6 +184,7 @@ object FirebaseHelper {
         nota.marca = obj.optString("marca", "")
         nota.tipoServicio = obj.optString("tipo_servicio", TiposReparacion.FORMATEO)
         nota.fallas = obj.optString("fallas", "")
+        nota.condicionesEquipo = obj.optString("condiciones_equipo", "")
         nota.anotaciones = obj.optString("anotaciones", "")
         nota.cargoCargador = obj.optBoolean("cargo_cargador", false)
         nota.soloEquipo = obj.optBoolean("solo_equipo", false)
@@ -193,6 +196,7 @@ object FirebaseHelper {
                 nota.refacciones.add(Refaccion(ro.optString("nombre", ""), ro.optDouble("costo", 0.0)))
             }
         }
+        nota.costoInicial = obj.optDouble("costo_inicial", 0.0)
         nota.anticipo = obj.optDouble("anticipo", 0.0)
         nota.precioTotal = obj.optDouble("precio_total", 0.0)
         val fotos = obj.optJSONArray("fotos")

@@ -17,6 +17,8 @@ import com.technology.taller.databinding.FragmentNuevoBinding
 import com.technology.taller.databinding.ItemFotoBinding
 import com.technology.taller.databinding.ItemRefaccionBinding
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 class NuevoFragment : Fragment() {
@@ -48,12 +50,16 @@ class NuevoFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         printerHelper = BluetoothPrinterHelper(requireContext())
 
-        binding.spinnerEquipo.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, TiposEquipo.lista)
-        binding.spinnerTipoServicio.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, TiposReparacion.lista)
+        binding.spinnerEquipo.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, TiposEquipo.lista).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        binding.spinnerTipoServicio.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, TiposReparacion.lista).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
 
         generarFolio()
+        generarFechaIngresoPorHoy()
+        renderizarPreciosRapidos()
 
         binding.btnImprimirFolio.setOnClickListener { imprimirFolio() }
+        binding.inputFechaIngreso.setOnClickListener { mostrarSelectorFecha(binding.inputFechaIngreso) }
+        binding.inputFechaEntrega.setOnClickListener { mostrarSelectorFecha(binding.inputFechaEntrega) }
         binding.btnAgregarRefaccion.setOnClickListener {
             refacciones.add(Refaccion())
             renderizarRefacciones()
@@ -61,12 +67,20 @@ class NuevoFragment : Fragment() {
         binding.btnTomarFoto.setOnClickListener { lanzadorCamara.launch(null) }
         binding.btnElegirGaleria.setOnClickListener { lanzadorGaleria.launch("image/*") }
 
-        binding.inputAnticipo.addTextChangedListener(watcher { sugerirTotal() })
+        binding.inputCostoInicial.addTextChangedListener(watcher { sugerirTotal() })
+        binding.inputAnticipo.addTextChangedListener(watcher { actualizarSaldoPendiente() })
+        binding.inputPrecioTotal.addTextChangedListener(watcher { actualizarSaldoPendiente() })
         sugerirTotal()
 
         binding.btnGuardar.setOnClickListener { guardar(previsualizar = false, imprimir = false) }
         binding.btnVistaPrevia.setOnClickListener { mostrarVistaPrevia() }
         binding.btnImprimir.setOnClickListener { guardar(previsualizar = false, imprimir = true) }
+        binding.btnWhatsapp.setOnClickListener { enviarWhatsApp() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (_binding != null) renderizarPreciosRapidos()
     }
 
     private fun generarFolio() {
@@ -74,7 +88,54 @@ class NuevoFragment : Fragment() {
         binding.inputFolio.setText(folioActual)
     }
 
+    private fun generarFechaIngresoPorHoy() {
+        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "MX"))
+        binding.inputFechaIngreso.setText(sdf.format(java.util.Date()))
+    }
+
+    private fun mostrarSelectorFecha(campo: android.widget.EditText) {
+        val cal = Calendar.getInstance()
+        val sdfSoloFecha = SimpleDateFormat("dd/MM/yyyy", Locale("es", "MX"))
+        val sdfHora = SimpleDateFormat("HH:mm", Locale("es", "MX"))
+        android.app.DatePickerDialog(requireContext(), { _, y, m, d ->
+            cal.set(y, m, d)
+            val horaActual = if (campo == binding.inputFechaIngreso) " ${sdfHora.format(java.util.Date())}" else ""
+            campo.setText(sdfSoloFecha.format(cal.time) + horaActual)
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
     // ---------- Refacciones ----------
+    private fun renderizarPreciosRapidos() {
+        val money = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+        binding.contenedorPreciosRapidos.removeAllViews()
+        val precios = PreciosConfig(requireContext()).obtenerPrecios()
+        if (precios.isEmpty()) {
+            binding.textPreciosRapidos.visibility = View.GONE
+            return
+        }
+        binding.textPreciosRapidos.visibility = View.VISIBLE
+        precios.forEach { precio ->
+            val boton = android.widget.Button(requireContext()).apply {
+                text = "${precio.nombre}\n${money.format(precio.precio)}"
+                textSize = 11f
+                isAllCaps = false
+                setPadding(24, 8, 24, 8)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.primario, null))
+                setTextColor(resources.getColor(R.color.blanco, null))
+            }
+            val params = ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            params.marginEnd = 12
+            boton.layoutParams = params
+            boton.setOnClickListener {
+                refacciones.add(Refaccion(precio.nombre, precio.precio))
+                renderizarRefacciones()
+                sugerirTotal()
+                Toast.makeText(requireContext(), "Agregado: ${precio.nombre}", Toast.LENGTH_SHORT).show()
+            }
+            binding.contenedorPreciosRapidos.addView(boton)
+        }
+    }
+
     private fun renderizarRefacciones() {
         binding.contenedorRefacciones.removeAllViews()
         refacciones.forEachIndexed { index, refaccion ->
@@ -96,13 +157,22 @@ class NuevoFragment : Fragment() {
     }
 
     private fun sugerirTotal() {
+        val costoInicial = binding.inputCostoInicial.text.toString().toDoubleOrNull() ?: 0.0
         val totalRefacciones = refacciones.sumOf { it.costo }
-        val anticipo = binding.inputAnticipo.text.toString().toDoubleOrNull() ?: 0.0
-        // Sugerencia automática (refacciones + anticipo), igual que la versión web.
+        // El costo final se sugiere como: costo inicial + piezas/servicios agregados después.
         // El campo queda habilitado para que el usuario lo ajuste manualmente si lo necesita.
         if (!binding.inputPrecioTotal.isFocused) {
-            binding.inputPrecioTotal.setText(String.format(Locale.US, "%.2f", totalRefacciones + anticipo))
+            binding.inputPrecioTotal.setText(String.format(Locale.US, "%.2f", costoInicial + totalRefacciones))
         }
+        actualizarSaldoPendiente()
+    }
+
+    private fun actualizarSaldoPendiente() {
+        val money = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+        val total = binding.inputPrecioTotal.text.toString().toDoubleOrNull() ?: 0.0
+        val anticipo = binding.inputAnticipo.text.toString().toDoubleOrNull() ?: 0.0
+        val saldo = (total - anticipo).coerceAtLeast(0.0)
+        binding.textSaldoPendiente.text = "Resta por pagar: ${money.format(saldo)}"
     }
 
     // ---------- Fotos ----------
@@ -133,7 +203,6 @@ class NuevoFragment : Fragment() {
             mostrarAlerta("⚠️ Nombre y teléfono son obligatorios.", esError = true)
             return null
         }
-        val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "MX"))
         val nota = Nota()
         nota.folio = binding.inputFolio.text.toString()
         nota.cliente = cliente
@@ -143,15 +212,18 @@ class NuevoFragment : Fragment() {
         nota.marca = binding.inputMarca.text.toString().trim()
         nota.tipoServicio = binding.spinnerTipoServicio.selectedItem?.toString() ?: TiposReparacion.FORMATEO
         nota.fallas = binding.inputFallas.text.toString().trim()
+        nota.condicionesEquipo = binding.inputCondiciones.text.toString().trim()
         nota.anotaciones = binding.inputAnotaciones.text.toString().trim()
-        nota.cargoCargador = binding.checkCargador.isChecked
-        nota.soloEquipo = binding.checkSoloEquipo.isChecked
-        nota.dejoAmbos = binding.checkAmbos.isChecked
+        nota.cargoCargador = binding.radioGroupEntrega.checkedRadioButtonId == binding.radioCargador.id
+        nota.soloEquipo = binding.radioGroupEntrega.checkedRadioButtonId == binding.radioSoloEquipo.id
+        nota.dejoAmbos = binding.radioGroupEntrega.checkedRadioButtonId == binding.radioAmbos.id
         nota.refacciones = refacciones.toMutableList()
+        nota.costoInicial = binding.inputCostoInicial.text.toString().toDoubleOrNull() ?: 0.0
         nota.anticipo = binding.inputAnticipo.text.toString().toDoubleOrNull() ?: 0.0
         nota.precioTotal = binding.inputPrecioTotal.text.toString().toDoubleOrNull() ?: 0.0
         nota.fotos = fotos.toMutableList()
-        nota.fecha = sdf.format(java.util.Date())
+        nota.fecha = binding.inputFechaIngreso.text.toString().trim()
+        nota.fechaEntrega = binding.inputFechaEntrega.text.toString().trim()
         return nota
     }
 
@@ -182,20 +254,22 @@ class NuevoFragment : Fragment() {
         binding.inputMarca.text?.clear()
         binding.inputFallas.text?.clear()
         binding.inputAnotaciones.text?.clear()
+        binding.inputCondiciones.text?.clear()
         binding.inputAnticipo.text?.clear()
+        binding.inputCostoInicial.text?.clear()
         binding.inputPrecioTotal.setText("0.00")
-        binding.checkCargador.isChecked = false
-        binding.checkSoloEquipo.isChecked = false
-        binding.checkAmbos.isChecked = false
+        binding.inputFechaEntrega.text?.clear()
+        binding.radioGroupEntrega.check(binding.radioSoloEquipo.id)
         refacciones.clear(); renderizarRefacciones()
         fotos.clear(); renderizarFotos()
         generarFolio()
+        generarFechaIngresoPorHoy()
     }
 
     // ---------- Vista previa / impresión ----------
     private fun mostrarVistaPrevia() {
         val nota = construirNota() ?: return
-        val texto = TicketGenerator.generarTicket(requireContext(), nota)
+        val texto = TicketGenerator.textoPlano(TicketGenerator.generarTicket(requireContext(), nota))
         val textView = TextView(requireContext()).apply {
             text = texto
             setPadding(32, 24, 32, 24)
@@ -206,8 +280,28 @@ class NuevoFragment : Fragment() {
             .setTitle("🧾 Vista previa")
             .setView(android.widget.ScrollView(requireContext()).apply { addView(textView) })
             .setPositiveButton("Imprimir") { _, _ -> imprimirNota(nota) }
+            .setNeutralButton("📲 WhatsApp") { _, _ -> ofrecerEnvioWhatsApp(nota) }
             .setNegativeButton("Cerrar", null)
             .show()
+    }
+
+    private fun ofrecerEnvioWhatsApp(nota: Nota) {
+        if (nota.fotos.isEmpty()) {
+            WhatsAppHelper.enviarTicket(requireContext(), nota)
+            return
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle("📲 Enviar por WhatsApp")
+            .setMessage("Esta remisión tiene ${nota.fotos.size} foto(s) del equipo. WhatsApp no deja mandar texto y fotos juntos automáticamente, así que son 2 pasos:\n\n1️⃣ Enviar el ticket (abre el chat del cliente)\n2️⃣ Enviar las fotos (elige el mismo chat)")
+            .setPositiveButton("1️⃣ Enviar ticket") { _, _ -> WhatsAppHelper.enviarTicket(requireContext(), nota) }
+            .setNeutralButton("2️⃣ Enviar fotos") { _, _ -> WhatsAppHelper.enviarFotos(requireContext(), nota.fotos) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun enviarWhatsApp() {
+        val nota = construirNota() ?: return
+        ofrecerEnvioWhatsApp(nota)
     }
 
     private fun imprimirNota(nota: Nota) {

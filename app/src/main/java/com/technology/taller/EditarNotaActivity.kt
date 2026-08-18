@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.technology.taller.databinding.ActivityEditarNotaBinding
 import com.technology.taller.databinding.ItemRefaccionBinding
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -34,8 +35,8 @@ class EditarNotaActivity : AppCompatActivity() {
         nota = notaRecibida
 
         binding.toolbar.setNavigationOnClickListener { finish() }
-        binding.spinnerEquipo.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, TiposEquipo.lista)
-        binding.spinnerTipoServicio.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, TiposReparacion.lista)
+        binding.spinnerEquipo.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, TiposEquipo.lista).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        binding.spinnerTipoServicio.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, TiposReparacion.lista).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
 
         precargar()
 
@@ -44,8 +45,14 @@ class EditarNotaActivity : AppCompatActivity() {
             refacciones.add(Refaccion())
             renderizarRefacciones()
         }
+        binding.inputCostoInicial.addTextChangedListener(watcher { sugerirTotal() })
+        binding.inputAnticipo.addTextChangedListener(watcher { actualizarSaldoPendiente() })
+        binding.inputPrecioTotal.addTextChangedListener(watcher { actualizarSaldoPendiente() })
         binding.btnActualizar.setOnClickListener { actualizar() }
         binding.btnReimprimir.setOnClickListener { reimprimir() }
+        binding.btnVistaPrevia.setOnClickListener { mostrarVistaPrevia() }
+        binding.btnReimprimirFolio.setOnClickListener { reimprimirFolio() }
+        binding.btnWhatsapp.setOnClickListener { enviarWhatsApp() }
         binding.btnEliminar.setOnClickListener { confirmarEliminar() }
     }
 
@@ -56,10 +63,14 @@ class EditarNotaActivity : AppCompatActivity() {
         binding.inputDireccion.setText(nota.direccion)
         binding.inputMarca.setText(nota.marca)
         binding.inputFallas.setText(nota.fallas)
+        binding.inputCondiciones.setText(nota.condicionesEquipo)
         binding.inputAnotaciones.setText(nota.anotaciones)
-        binding.checkCargador.isChecked = nota.cargoCargador
-        binding.checkSoloEquipo.isChecked = nota.soloEquipo
-        binding.checkAmbos.isChecked = nota.dejoAmbos
+        when {
+            nota.dejoAmbos -> binding.radioGroupEntrega.check(binding.radioAmbos.id)
+            nota.cargoCargador -> binding.radioGroupEntrega.check(binding.radioCargador.id)
+            else -> binding.radioGroupEntrega.check(binding.radioSoloEquipo.id)
+        }
+        binding.inputCostoInicial.setText(if (nota.costoInicial > 0) nota.costoInicial.toString() else "")
         binding.inputAnticipo.setText(if (nota.anticipo > 0) nota.anticipo.toString() else "")
         binding.inputPrecioTotal.setText(if (nota.precioTotal > 0) nota.precioTotal.toString() else "0.00")
         binding.inputFechaEntrega.setText(nota.fechaEntrega)
@@ -72,6 +83,7 @@ class EditarNotaActivity : AppCompatActivity() {
         refacciones.clear()
         refacciones.addAll(nota.refacciones.map { it.copy() })
         renderizarRefacciones()
+        actualizarSaldoPendiente()
     }
 
     private fun renderizarRefacciones() {
@@ -81,13 +93,35 @@ class EditarNotaActivity : AppCompatActivity() {
             item.inputNombreRefaccion.setText(refaccion.nombre)
             item.inputCostoRefaccion.setText(if (refaccion.costo > 0) refaccion.costo.toString() else "")
             item.inputNombreRefaccion.addTextChangedListener(watcher { refaccion.nombre = item.inputNombreRefaccion.text.toString() })
-            item.inputCostoRefaccion.addTextChangedListener(watcher { refaccion.costo = item.inputCostoRefaccion.text.toString().toDoubleOrNull() ?: 0.0 })
+            item.inputCostoRefaccion.addTextChangedListener(watcher {
+                refaccion.costo = item.inputCostoRefaccion.text.toString().toDoubleOrNull() ?: 0.0
+                sugerirTotal()
+            })
             item.btnQuitarRefaccion.setOnClickListener {
                 refacciones.removeAt(index)
                 renderizarRefacciones()
+                sugerirTotal()
             }
             binding.contenedorRefacciones.addView(item.root)
         }
+    }
+
+    /** Sugiere el costo final = costo inicial + todas las piezas/servicios agregados (incluyendo los que se sumen después, en edición). */
+    private fun sugerirTotal() {
+        val costoInicial = binding.inputCostoInicial.text.toString().toDoubleOrNull() ?: 0.0
+        val totalRefacciones = refacciones.sumOf { it.costo }
+        if (!binding.inputPrecioTotal.isFocused) {
+            binding.inputPrecioTotal.setText(String.format(Locale.US, "%.2f", costoInicial + totalRefacciones))
+        }
+        actualizarSaldoPendiente()
+    }
+
+    private fun actualizarSaldoPendiente() {
+        val money = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+        val total = binding.inputPrecioTotal.text.toString().toDoubleOrNull() ?: 0.0
+        val anticipo = binding.inputAnticipo.text.toString().toDoubleOrNull() ?: 0.0
+        val saldo = (total - anticipo).coerceAtLeast(0.0)
+        binding.textSaldoPendiente.text = "Resta por pagar: ${money.format(saldo)}"
     }
 
     private fun mostrarSelectorFecha() {
@@ -107,11 +141,13 @@ class EditarNotaActivity : AppCompatActivity() {
         nota.marca = binding.inputMarca.text.toString().trim()
         nota.tipoServicio = binding.spinnerTipoServicio.selectedItem?.toString() ?: nota.tipoServicio
         nota.fallas = binding.inputFallas.text.toString().trim()
+        nota.condicionesEquipo = binding.inputCondiciones.text.toString().trim()
         nota.anotaciones = binding.inputAnotaciones.text.toString().trim()
-        nota.cargoCargador = binding.checkCargador.isChecked
-        nota.soloEquipo = binding.checkSoloEquipo.isChecked
-        nota.dejoAmbos = binding.checkAmbos.isChecked
+        nota.cargoCargador = binding.radioGroupEntrega.checkedRadioButtonId == binding.radioCargador.id
+        nota.soloEquipo = binding.radioGroupEntrega.checkedRadioButtonId == binding.radioSoloEquipo.id
+        nota.dejoAmbos = binding.radioGroupEntrega.checkedRadioButtonId == binding.radioAmbos.id
         nota.refacciones = refacciones.toMutableList()
+        nota.costoInicial = binding.inputCostoInicial.text.toString().toDoubleOrNull() ?: 0.0
         nota.anticipo = binding.inputAnticipo.text.toString().toDoubleOrNull() ?: 0.0
         nota.precioTotal = binding.inputPrecioTotal.text.toString().toDoubleOrNull() ?: 0.0
         nota.fechaEntrega = binding.inputFechaEntrega.text.toString().trim()
@@ -142,6 +178,56 @@ class EditarNotaActivity : AppCompatActivity() {
         Toast.makeText(this, "Imprimiendo...", Toast.LENGTH_SHORT).show()
         printerHelper.imprimirNota(actualizada,
             onExito = { runOnUiThread { Toast.makeText(this, "Impreso", Toast.LENGTH_SHORT).show() } },
+            onError = { msg -> runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_LONG).show() } }
+        )
+    }
+
+    private fun mostrarVistaPrevia() {
+        val actualizada = recogerCambios()
+        val texto = TicketGenerator.textoPlano(TicketGenerator.generarTicket(this, actualizada))
+        val textView = android.widget.TextView(this).apply {
+            text = texto
+            setPadding(32, 24, 32, 24)
+            typeface = android.graphics.Typeface.MONOSPACE
+            textSize = 12f
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("🧾 Vista previa — Folio ${actualizada.folio}")
+            .setView(android.widget.ScrollView(this).apply { addView(textView) })
+            .setPositiveButton("Imprimir") { _, _ -> reimprimir() }
+            .setNeutralButton("📲 WhatsApp") { _, _ -> ofrecerEnvioWhatsApp(actualizada) }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun ofrecerEnvioWhatsApp(nota: Nota) {
+        if (nota.fotos.isEmpty()) {
+            WhatsAppHelper.enviarTicket(this, nota)
+            return
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("📲 Enviar por WhatsApp")
+            .setMessage("Esta remisión tiene ${nota.fotos.size} foto(s) del equipo. WhatsApp no deja mandar texto y fotos juntos automáticamente, así que son 2 pasos:\n\n1️⃣ Enviar el ticket (abre el chat del cliente)\n2️⃣ Enviar las fotos (elige el mismo chat)")
+            .setPositiveButton("1️⃣ Enviar ticket") { _, _ -> WhatsAppHelper.enviarTicket(this, nota) }
+            .setNeutralButton("2️⃣ Enviar fotos") { _, _ -> WhatsAppHelper.enviarFotos(this, nota.fotos) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun enviarWhatsApp() {
+        val actualizada = recogerCambios()
+        ofrecerEnvioWhatsApp(actualizada)
+    }
+
+    private fun reimprimirFolio() {
+        val actualizada = recogerCambios()
+        if (!printerHelper.hayImpresoraConfigurada()) {
+            Toast.makeText(this, "Configura tu miniprinter primero en Config > Impresora", Toast.LENGTH_LONG).show()
+            return
+        }
+        Toast.makeText(this, "Imprimiendo folio...", Toast.LENGTH_SHORT).show()
+        printerHelper.imprimirFolio(actualizada,
+            onExito = { runOnUiThread { Toast.makeText(this, "Folio impreso", Toast.LENGTH_SHORT).show() } },
             onError = { msg -> runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_LONG).show() } }
         )
     }

@@ -20,37 +20,77 @@
             android:textAlignment="center"
             android:visibility="gone" />
 
-        <!-- Folio -->
+        <!-- Folio (compacto) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="bottom">
+            android:gravity="center_vertical">
 
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="Folio (auto)">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputFolio"
-                    android:layout_width="match_parent"
+                android:orientation="vertical"
+                android:background="@drawable/bg_folio_chip"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:focusable="false"
+                    android:text="FOLIO"
+                    android:textColor="@color/gris_texto"
+                    android:textSize="9sp"
                     android:textStyle="bold"
-                    android:textColor="#E67E22" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:letterSpacing="0.08" />
+
+                <TextView
+                    android:id="@+id/inputFolio"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:textSize="15sp"
+                    android:textColor="#B8860B"
+                    tools:text="171Rh"
+                    xmlns:tools="http://schemas.android.com/tools" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/btnImprimirFolio"
                 android:layout_width="wrap_content"
-                android:layout_height="56dp"
+                android:layout_height="36dp"
                 android:layout_marginStart="8dp"
-                android:backgroundTint="#F39C12"
+                android:backgroundTint="#F1C40F"
                 android:text="🏷️ Folio"
-                android:textSize="12sp" />
+                android:textColor="@color/fondo"
+                android:textSize="11sp"
+                android:paddingHorizontal="12dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp" />
+
         </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Imprime una etiqueta con el folio, teléfono, dirección y fecha, para pegarla en el equipo."
+            android:textColor="@color/gris_texto"
+            android:textSize="11sp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="📅 Fecha de ingreso">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputFechaIngreso"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:focusable="false" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -167,6 +207,20 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
+            android:hint="Condiciones en que llega el equipo (rayones, golpes, faltantes...)">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputCondiciones"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textMultiLine"
+                android:minLines="2" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             android:hint="Anotaciones / diagnóstico inicial">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/inputAnotaciones"
@@ -176,16 +230,26 @@
                 android:minLines="2" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <LinearLayout
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="¿Qué dejó el cliente?"
+            android:textColor="@color/fondo"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/radioGroupEntrega"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="4dp"
             android:orientation="horizontal">
 
-            <CheckBox android:id="@+id/checkCargador" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Cargador" android:textSize="12sp" />
-            <CheckBox android:id="@+id/checkSoloEquipo" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Solo equipo" android:textSize="12sp" />
-            <CheckBox android:id="@+id/checkAmbos" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Dejó ambos" android:textSize="12sp" />
-        </LinearLayout>
+            <RadioButton android:id="@+id/radioCargador" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Cargador" android:textSize="12sp" />
+            <RadioButton android:id="@+id/radioSoloEquipo" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Solo equipo" android:textSize="12sp" android:checked="true" />
+            <RadioButton android:id="@+id/radioAmbos" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Dejó ambos" android:textSize="12sp" />
+        </RadioGroup>
 
         <!-- Refacciones -->
         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#DDDDDD" android:layout_marginTop="14dp" />
@@ -213,11 +277,46 @@
             android:text="➕ Agregar pieza o servicio extra"
             android:textSize="13sp" />
 
+        <TextView
+            android:id="@+id/textPreciosRapidos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Toca para agregar un servicio con su precio configurado:"
+            android:textColor="@color/gris_texto"
+            android:textSize="11sp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/contenedorPreciosRapidos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:hint="Costo inicial / cotización ($)">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputCostoInicial"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="12dp">
+            android:layout_marginTop="10dp">
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -225,7 +324,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:hint="Anticipo ($)">
+                android:hint="Anticipo ($, puede ser 0)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/inputAnticipo"
                     android:layout_width="match_parent"
@@ -239,7 +338,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="6dp"
-                android:hint="Precio total final ($)">
+                android:hint="Costo final ($)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/inputPrecioTotal"
                     android:layout_width="match_parent"
@@ -250,10 +349,36 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/textSaldoPendiente"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#FEF3C7"
+            android:padding="10dp"
+            android:text="Resta por pagar: $0.00"
+            android:textColor="#92400E"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:hint="📅 Fecha de entrega (estimada)">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputFechaEntrega"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:focusable="false" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
             android:id="@+id/textAyudaTotal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="El total se sugiere automáticamente (refacciones + anticipo), pero puedes editarlo libremente."
+            android:layout_marginTop="6dp"
+            android:text="El costo final se sugiere automáticamente (costo inicial + piezas agregadas), pero puedes editarlo. El anticipo puede quedar en $0 si el cliente no dejó nada."
             android:textColor="@color/gris_texto"
             android:textSize="11sp" />
 
@@ -327,9 +452,17 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="24dp"
             android:backgroundTint="@color/acento"
             android:text="🖨️ IMPRIMIR TICKET" />
+
+        <Button
+            android:id="@+id/btnWhatsapp"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="24dp"
+            android:backgroundTint="#25D366"
+            android:text="📲 ENVIAR POR WHATSAPP" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
